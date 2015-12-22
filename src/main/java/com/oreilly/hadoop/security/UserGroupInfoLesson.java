@@ -6,7 +6,9 @@ import java.io.PrintWriter;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.conf.Configured;
-
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import java.security.PrivilegedAction;
 
 public class UserGroupInfoLesson extends Configured implements Tool {
 	
@@ -32,7 +34,28 @@ public class UserGroupInfoLesson extends Configured implements Tool {
       /* After a successful login, you can do HDFS or Hadoop operations */ 
   }
  
-// foo 
+  public void proxyUser(String user) throws Exception {
+	  final Configuration config = this.getConf();
+	  UserGroupInformation.setConfiguration(config);
+	  UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+	  UserGroupInformation proxy = UserGroupInformation.createProxyUser(user,  ugi);
+	  System.out.println("Proxy user: " + proxy.getUserName());
+	  System.out.println("Real user: " + proxy.getRealUser());
+	  dumpBasicInfo();
+	  proxy.doAs(new PrivilegedAction<Void> () {
+		  public Void run() throws RuntimeException {
+			  try {
+			  FileSystem fs = FileSystem.get(config);
+			  fs.mkdirs(new Path("/tmp/proxy-user-test"));
+			  return null;
+			  } catch (Exception e) {
+				  throw new RuntimeException(e);
+			  }
+		  }
+	  });
+	  FileSystem fs = FileSystem.get(config);
+	  fs.mkdirs(new Path("/tmp/proxy-user-test"));
+  }
  
   public int run(String[] args) throws Exception {
       if (args[0].equals("--dumpConfig")) {
@@ -45,6 +68,9 @@ public class UserGroupInfoLesson extends Configured implements Tool {
       if (args[0].equals("--basicInfo")) {
     	  dumpBasicInfo();
       }      
+      if (args[0].equals("--proxyUser")) {
+    	  proxyUser(args[1]);
+      }
     return 0;
   }
   
